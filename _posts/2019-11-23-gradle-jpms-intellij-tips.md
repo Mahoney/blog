@@ -1,4 +1,11 @@
-# Tips for Using Gradle to build JPMS Modules when Developing with IntelliJ
+---
+layout: post
+title: Tips for Using Gradle to build JPMS Modules when Developing with IntelliJ
+date: '2019-11-23T14:05:00.003+01:00'
+author: Robert Elliot
+tags:
+modified_time: '2019-11-23T14:05:00.003+01:00'
+---
 
 I've recently been trying to get a project going with the following stack:
 
@@ -173,4 +180,4 @@ dependencies {
 ## Example Project
 
 These ideas can be seen implemented at
-https://github.com/Mahoney-example/example-gradle-kotlin-javafx
+[https://github.com/Mahoney-example/example-gradle-kotlin-javafx](https://github.com/Mahoney-example/example-gradle-kotlin-javafx)
