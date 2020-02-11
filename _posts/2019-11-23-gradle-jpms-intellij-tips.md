@@ -42,8 +42,8 @@ repositories {
 }
 
 dependencies {
-  runtimeOnly("org.javamodularity:moduleplugin:1.5.0")
-  runtimeOnly("org.openjfx:javafx-plugin:0.0.8")
+  testRuntimeOnly("org.javamodularity:moduleplugin:1.5.0")
+  testRuntimeOnly("org.openjfx:javafx-plugin:0.0.8")
 }
 ```
 
