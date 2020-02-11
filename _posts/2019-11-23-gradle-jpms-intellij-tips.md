@@ -177,6 +177,48 @@ dependencies {
 }
 ```
 
+
+## Prevent intermediate directories becoming projects
+
+By default, if you include deeply nested projects like this:
+
+#### `settings.gradle.kts`
+```kotlin
+include(
+  ":app",
+  ":core",
+  ":ui:api",
+  ":ui:javafx"
+)
+```
+the intermediate directories (in this case `ui`) will become gradle projects,
+despite lacking a `build.gradle.kts` and any other files. This can cause very
+confusing errors like this one:
+```
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+A problem occurred configuring project ':app'.
+> A problem occurred configuring project ':ui:api'.
+   > Could not open cache directory add8lpbh91wftlbit7lhn37cw (/home/runner/.gradle/caches/6.0.1/gradle-kotlin-dsl/add8lpbh91wftlbit7lhn37cw).
+      > org.gradle.api.internal.initialization.DefaultClassLoaderScope@47f3a892 must be locked before it can be used to compute a classpath!
+```
+
+You can fix this by including the specific project and setting its dir
+explicitly, as so:
+
+#### `settings.gradle.kts`
+```kotlin
+include(
+  ":app",
+  ":core",
+  ":ui-api",
+  ":ui-javafx"
+)
+project(":ui-api").projectDir = file("ui/api")
+project(":ui-javafx").projectDir = file("ui/javafx")
+```
+
 ## Example Project
 
 These ideas can be seen implemented at
