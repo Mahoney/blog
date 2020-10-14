@@ -7,7 +7,7 @@ main() {
   local title_kebab_case && title_kebab_case=$(
     echo "${title// /-}" | tr '[:upper:]' '[:lower:]'
   )
-  local time && time=$(date +'%Y-%m-%dT%H:%M:%S%s%z')
+  local time && time=$(date +'%Y-%m-%dT%H:%M:%S.000%z')
   local date && date=$(date +'%Y-%m-%d')
 
   echo "---
