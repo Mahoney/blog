@@ -22,6 +22,7 @@ during the day would benefit from a nice minimal cache.
 I think the following GitHub action achieves this, by including the current
 date in the base cache key:
 
+{% raw %}
 ```yaml
 name: My Build
 
@@ -57,3 +58,4 @@ jobs:
                ${{ env.cache-name }}_${{ steps.date.outputs.date }}-${{ github.ref }}-
                ${{ env.cache-name }}_${{ steps.date.outputs.date }}-
 ``` 
+{% endraw %}
