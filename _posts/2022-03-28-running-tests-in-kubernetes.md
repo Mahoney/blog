@@ -124,8 +124,7 @@ set -euo pipefail
 
 eval "$(minikube docker-env)"
 
-docker buildx build . \
-  -t myimage:local
+docker buildx build . -t myimage:local
 
 ./run-k8s-tests.sh
 ```
