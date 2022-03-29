@@ -18,11 +18,14 @@ to see them locally.
 ## Basics:
 1. GitHub Action steps
    ```yaml
-      - name: start minikube
-        uses: medyagh/setup-minikube@latest
+   jobs:
+     build:
+       steps:
+         - name: start minikube
+           uses: medyagh/setup-minikube@latest
 
-      - name: K8S Tests
-          run: run-k8s-tests.sh
+         - name: K8S Tests
+           run: run-k8s-tests.sh
    ```
 2. run-k8s-tests.sh
    ```bash
