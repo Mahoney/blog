@@ -20,11 +20,14 @@ and specifically for AWS at [Configuring OpenID Connect in Amazon Web Services][
 1) Add an Identity Provider in AWS IAM
    - Provider: `token.actions.githubusercontent.com` 
    - Audience: `sts.amazonaws.com`
+
 2) Create an IAM Role
+
 3) Under **Permissions** add a policy granting whatever it is the role needs to do
    (can be an inline policy, whatever - this is a standard IAM role, specific to
    what you need to do, nothing to do with it being GitHub Actions that will do
    it).
+
 4) Under **Trust relationships** add something like this:
    ```json
     {
@@ -67,6 +70,7 @@ and specifically for AWS at [Configuring OpenID Connect in Amazon Web Services][
    ```
    **You may need further permissions for other actions!** See
    [Adding permissions settings][4] for more details / examples.
+
 2) Add the following step to your job:
    ```yaml
    - name: configure aws credentials
