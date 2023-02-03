@@ -6,23 +6,21 @@ author: Robert Elliot
 tags:
 ---
 
-[Sam Cooper on the Kotlin Slack](https://kotlinlang.slack.com/archives/C0B8MA7FA/p1675173615409839)
-showed me that you can create an immutable-ish class that is both a
-`Map<String, T>` and has `val` properties representing compile time enforced
-keys on that `Map`, and without much duplication.
+[Sam Cooper](https://medium.com/@sam-cooper) showed me on the Kotlin Slack that
+you can create an immutable-ish class that is both a `Map<String, T>` and has
+`val` properties representing compile time enforced  keys on that `Map`, and
+without much duplication.
 
 Create this abstract class:
 
 ```kotlin
 abstract class AbstractPropertyMap<V>(
-  protected val properties: MutableMap<String, V> = mutableMapOf()
+  private val properties: MutableMap<String, V> = mutableMapOf()
 ) : Map<String, V> by properties {
-  companion object {
-    operator fun <V> MutableMap<String, V>.invoke(initialValue: V) =
-      PropertyDelegateProvider<Any, Map<String, V>> { _, property ->
-        apply { put(property.name, initialValue) }
-      }
-  }
+  protected fun property(initialValue: V) =
+    PropertyDelegateProvider<Any, Map<String, V>> { _, prop ->
+      properties.apply { put(prop.name, initialValue) }
+    }
 }
 ```
 
@@ -33,8 +31,8 @@ class Links(
   id: String, 
   otherId: String,
 ) : AbstractPropertyMap<URI>() {
-  val self by properties(URI.create("/v1/$id"))
-  val other by properties(URI.create("/v1/other/$otherId"))
+  val self by property(URI.create("/v1/$id"))
+  val other by property(URI.create("/v1/other/$otherId"))
 }
 
 val links = Links("1", "2")
