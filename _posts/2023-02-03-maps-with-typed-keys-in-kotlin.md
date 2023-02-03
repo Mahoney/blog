@@ -6,7 +6,7 @@ author: Robert Elliot
 tags:
 ---
 
-[Sam Cooper on the Kotlin Slack](https://kotlinlang.slack.com/archives/C0B8MA7FA/p1675173615409839),
+[Sam Cooper on the Kotlin Slack](https://kotlinlang.slack.com/archives/C0B8MA7FA/p1675173615409839)
 showed me that you can create an immutable-ish class that is both a
 `Map<String, T>` and has `val` properties representing compile time enforced
 keys on that `Map`, and without much duplication.
