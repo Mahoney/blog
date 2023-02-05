@@ -14,10 +14,10 @@ without much duplication.
 Create this abstract class:
 
 ```kotlin
-abstract class AbstractPropertyMap<V>(
+abstract class AbstractPropertyMap2<out V>(
   private val properties: MutableMap<String, V> = mutableMapOf()
 ) : Map<String, V> by properties {
-  protected fun property(initialValue: V) =
+  protected fun property(initialValue: @UnsafeVariance V) =
     PropertyDelegateProvider<Any, Map<String, V>> { _, prop ->
       properties.apply { put(prop.name, initialValue) }
     }
