@@ -8,31 +8,43 @@ tags:
 
 [Sam Cooper](https://medium.com/@sam-cooper) showed me on the Kotlin Slack that
 you can create an immutable-ish class that is both a `Map<String, T>` and has
-`val` properties representing compile time enforced  keys on that `Map`, and
+`val` properties representing compile time enforced keys on that `Map`, and
 without much duplication.
+
+Edit 2023-02-06 - we've made a couple of improvements:
+
+* It's now invariant in `V`, the type of the values, so an
+  `AbstractPropertyMap<String>` is a subtype of
+  `AbstractPropertyMap<CharSequence>`
+* The type of the properties is now captured by the type of the argument to
+  `property`, so in an `AbstractPropertyMap<CharSequence>`
+  `val aString by property("a string")` will have its type inferred as
+  `String`. (This is obviously useful if extending  `AbstractPropertyMap<Any>`.)
 
 Create this abstract class:
 
 ```kotlin
-abstract class AbstractPropertyMap2<out V>(
+abstract class AbstractPropertyMap<out V>(
   private val properties: MutableMap<String, V> = mutableMapOf()
 ) : Map<String, V> by properties {
-  protected fun property(initialValue: @UnsafeVariance V) =
-    PropertyDelegateProvider<Any, Map<String, V>> { _, prop ->
-      properties.apply { put(prop.name, initialValue) }
+  protected fun <V2 : @UnsafeVariance V> property(initialValue: V2) =
+    PropertyDelegateProvider<Any, ReadOnlyProperty<Any, V2>> { _, prop ->
+      properties[prop.name] = initialValue
+      ReadOnlyProperty(properties::getValue)
     }
 }
+
 ```
 
 You can then create subclasses as so:
 
 ```kotlin
 class Links(
-  id: String, 
-  otherId: String,
+    id: String,
+    otherId: String,
 ) : AbstractPropertyMap<URI>() {
-  val self by property(URI.create("/v1/$id"))
-  val other by property(URI.create("/v1/other/$otherId"))
+    val self by property(URI.create("/v1/$id"))
+    val other by property(URI.create("/v1/other/$otherId"))
 }
 
 val links = Links("1", "2")
@@ -44,8 +56,11 @@ links.other == URI.create("/v1/other/2")
 links["other"] == links.other
 
 links.keys == setOf("self", "other")
-links.values.toList() ==  listOf(links.self, links.other)
-links.entries == setOf(SimpleImmutableEntry("self", links.self), SimpleImmutableEntry("other", links.other))
+links.values.toList() == listOf(links.self, links.other)
+links.entries == setOf(
+    SimpleImmutableEntry("self", links.self),
+    SimpleImmutableEntry("other", links.other)
+)
 ```
 
 Which begs the question - why?
@@ -67,15 +82,15 @@ be more noisy and require duplicating key names:
 
 ```kotlin
 class Links(
-  id: String,
-  otherId: String,
+    id: String,
+    otherId: String,
 ) : AbstractMap<String, URI>() {
-  val self = URI.create("/v1/$id")
-  val other = URI.create("/v1/other/$otherId")
+    val self = URI.create("/v1/$id")
+    val other = URI.create("/v1/other/$otherId")
 
-  override val entries: Set<Map.Entry<String, URI>> = setOf(
-    AbstractMap.SimpleImmutableEntry("self", self),
-    AbstractMap.SimpleImmutableEntry("other", other),
-  )
+    override val entries: Set<Map.Entry<String, URI>> = setOf(
+        AbstractMap.SimpleImmutableEntry("self", self),
+        AbstractMap.SimpleImmutableEntry("other", other),
+    )
 }
 ```
