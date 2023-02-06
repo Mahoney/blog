@@ -40,11 +40,11 @@ You can then create subclasses as so:
 
 ```kotlin
 class Links(
-    id: String,
-    otherId: String,
+  id: String,
+  otherId: String,
 ) : AbstractPropertyMap<URI>() {
-    val self by property(URI.create("/v1/$id"))
-    val other by property(URI.create("/v1/other/$otherId"))
+  val self by property(URI.create("/v1/$id"))
+  val other by property(URI.create("/v1/other/$otherId"))
 }
 
 val links = Links("1", "2")
@@ -58,8 +58,8 @@ links["other"] == links.other
 links.keys == setOf("self", "other")
 links.values.toList() == listOf(links.self, links.other)
 links.entries == setOf(
-    SimpleImmutableEntry("self", links.self),
-    SimpleImmutableEntry("other", links.other)
+  SimpleImmutableEntry("self", links.self),
+  SimpleImmutableEntry("other", links.other)
 )
 ```
 
