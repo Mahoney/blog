@@ -33,7 +33,6 @@ abstract class AbstractPropertyMap<out V>(
       ReadOnlyProperty(properties::getValue)
     }
 }
-
 ```
 
 You can then create subclasses as so:
