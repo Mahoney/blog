@@ -98,7 +98,7 @@ class CliParser private constructor(
   companion object {
 
       fun parseConfig(
-          args: List<String> = emptyList(),
+          args: List<String>,
           env: Map<String, String> = System.getenv(),
       ): Config =
           CliParser(env)
