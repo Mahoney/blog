@@ -63,3 +63,55 @@ class CliParser(
   }
 }
 ```
+
+## Putting them together
+
+```kotlin
+import com.github.ajalt.clikt.core.NoOpCliktCommand
+import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.options.required
+
+fun main(vararg args: String) {
+    val config: Config = CliParser.parseConfig(*args)
+}
+
+data class Config(val username: String)
+
+class CliParser private constructor(
+  env: Map<String, String>
+) : NoOpCliktCommand(
+  name = "",
+  help = "help text",
+) {
+
+  init {
+    context {
+      envarReader = env::get
+      autoEnvvarPrefix = "MY_APP"
+    }
+  }
+
+  private val username: String by option(help = "the username").required()
+
+  private fun toConfig() = Config(username = username)
+
+  companion object {
+
+      fun parseConfig(
+          args: List<String> = emptyList(),
+          env: Map<String, String> = System.getenv(),
+      ): Config =
+          CliParser(env)
+              .apply { parse(args) }
+              .toConfig()
+
+    fun parseConfig(
+        vararg args: String,
+        env: Map<String, String> = System.getenv(), 
+    ): Config = parseConfig(
+        args.toList(), 
+        env,
+    )
+  }
+}
+```
