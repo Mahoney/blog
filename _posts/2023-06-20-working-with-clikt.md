@@ -21,6 +21,10 @@ import com.github.ajalt.clikt.core.NoOpCliktCommand
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 
+fun main(vararg args: String) {
+  val config: Config = CliParser.parseConfig(*args)
+}
+
 data class Config(val username: String)
 
 class CliParser private constructor() : NoOpCliktCommand(
