@@ -186,12 +186,14 @@ upstream services via a header sent _before_ the rest of the request (including 
 Groups for AWS NLBs can be configured to send it][aws_proxy_protocol] (in the console, edit the Target Group's
 "Attributes"), and [nginx can be configured to expect it][nginx_proxy_protocol].
 
-(Ideally applications do not need this information - they should return links as URI references rather than URLs, either
+Ideally applications do not need this information - they should return links as URI references rather than URLs, either
 omitting the scheme (e.g. `//example.com/my/thing`) or the entire authority (e.g. `/my/thing`). However, some frameworks
 insist on returning URLs for e.g. the [`Location` header][location_header], reconstructing the scheme from the
 `X-Forwarded-Proto` or [`Forwarded` header][forwarded_header], falling back on the scheme the process is listening for,
-because previous (obsolete) versions of the HTTP specification [required the `Location` header to contain a URL]
-[rfc_2616_location_header].)
+because previous (obsolete) versions of the HTTP specification
+[required the `Location` header to contain a URL][rfc_2616_location_header].
+
+If http to https redirection is expected to happen upstream of an NLB then proxy information will be required.
 
 [aws_lbc]: https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/
 [aws_alb_ingress]: https://kubernetes-sigs.github.io/aws-load-balancer-controller/v1.1/
