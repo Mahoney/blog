@@ -18,7 +18,10 @@ main() {
   docker build --quiet --tag "$IMAGE" . > /dev/null
 
   if "$serve"; then
-    run --publish 4000:4000 -- jekyll serve --host 0.0.0.0 --livereload
+    # 35729 is the livereload channel the injected script connects back
+    # to; without it published, pages load but never auto-reload.
+    run --publish 4000:4000 --publish 35729:35729 \
+      -- jekyll serve --host 0.0.0.0 --livereload
   else
     run -- jekyll build
   fi
