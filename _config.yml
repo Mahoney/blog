@@ -10,22 +10,43 @@
 
 # Site settings
 # These are used to personalize your new site. If you look in the HTML files,
-# you will see them accessed via {{ site.title }}, {{ site.email }}, and so on.
-# You can create any custom variable you would like, and they will be accessible
-# in the templates via {{ site.myvariable }}.
+# you will see them accessed via {{ site.title }}, {{ site.author.email }}, and
+# so on. You can create any custom variable you would like, and they will be
+# accessible in the templates via {{ site.myvariable }}.
 title: Software Development Thoughts
-email: rob@lidalia.org.uk
 description: Thoughts on Software Development
+author:
+  name: Robert Elliot
+  email: rob@lidalia.org.uk
 baseurl: ""
 url: https://blog.lidalia.org.uk
-twitter_username: RobElliot266
-github_username: Mahoney
 
 # Build settings
 markdown: kramdown
-theme: minima
+
+# Minima 3 is not released as a gem, so it is consumed from its repository.
+# Pinned to a specific commit - upstream master is a moving target.
+remote_theme: jekyll/minima@4de322363fca5927e6f4012cb94f6dad69ab5e6c
+
 plugins:
+  - jekyll-remote-theme
   - jekyll-feed
+  - jekyll-seo-tag
+
+minima:
+  skin: auto
+  social_links:
+    - title: Rob Elliot at GitHub
+      icon: github
+      url: "https://github.com/Mahoney"
+    - title: Rob Elliot at X (formerly Twitter)
+      icon: x-twitter
+      url: "https://x.com/RobElliot266"
+
+# Minima 3 still uses the deprecated @import syntax.
+sass:
+  quiet_deps: true
+  silence_deprecations: [import]
 
 permalink: /:categories/:year/:month/:title.html
 
