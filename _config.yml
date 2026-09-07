@@ -49,3 +49,4 @@ exclude:
   - new_post.sh
   - Dockerfile
   - .dockerignore
+  - README.md
