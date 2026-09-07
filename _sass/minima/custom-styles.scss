@@ -31,8 +31,9 @@
 }
 
 // Narrow viewports have no left margin to spare, so inline the anchor after
-// the heading text instead of hanging it outside.
-@media screen and (max-width: 800px) {
+// the heading text instead of hanging it outside. Uses Minima's own
+// breakpoint, which is where it drops the wrapper's horizontal padding.
+@include media-query($on-large) {
   .post-content .heading-anchor {
     position: static;
     padding-right: 0;

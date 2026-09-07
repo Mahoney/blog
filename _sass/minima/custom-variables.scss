@@ -1,0 +1,4 @@
+// Minima's 800px default is tight for posts containing code, HTTP exchanges
+// and JSON. Imported before minima/base and minima/layout, which are what
+// consume this, so a plain assignment is enough.
+$content-width: 1000px;
