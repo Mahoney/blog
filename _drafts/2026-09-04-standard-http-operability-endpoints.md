@@ -11,11 +11,12 @@ reasoning after.
 
 ## Recommendations
 
-One port, the one that serves traffic. Everything operability lives under `/-/`. Restrict access to `/-/` by path at
-the ingress.
+One port, the one that serves traffic. Everything operability lives under `/-/`, which is itself an index of the
+rest. Restrict access to `/-/` by path at the ingress.
 
 | Endpoint     | For                 | Response                                                                                                     | Content-Type                                                 | Format                          |
 |--------------|---------------------|--------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------|---------------------------------|
+| `/-/`        | Discovery           | 200. `_links` to the five endpoints below, keyed `live`, `ready`, `status`, `info`, `metrics`.               | `application/hal+json`                                       | [HAL][hal]                      |
 | `/-/live`    | Restart checks      | 200 `pass`, or 503 `fail` if the process is broken. `checks` lists the liveness checks.                      | `application/health+json`                                    | [IETF health check draft][ietf] |
 | `/-/ready`   | Routing checks      | 503 `fail` while starting, draining or not the leader, else 200 `pass`. `checks` lists the lifecycle checks. | `application/health+json`                                    | [IETF health check draft][ietf] |
 | `/-/status`  | Humans and alerting | Always 200. `checks` lists everything: liveness, lifecycle, pressure, dependencies.                          | `application/health+json`                                    | [IETF health check draft][ietf] |
@@ -52,7 +53,6 @@ dependency, not by the infrastructure taking the instance out.
 matcher defaults to 200, and `curl -f` exits non-zero on 400 and above. In practice a broken process more often times
 out than answers 503, so probe timeouts matter as much as the response.
 
-`/-/info` looks like:
 `/-/status` on an instance whose database is unreachable looks like:
 
 ```json
@@ -79,6 +79,7 @@ Keys in `checks` are `component:measurement`. Each maps to an array, since a com
 once. The top-level `status` is the worst of the checks. `/-/live` here would return only `event-loop:lag`, and
 `/-/ready` only `lifecycle:phase`, both `pass`.
 
+`/-/info` looks like:
 
 ```json
 {
@@ -183,6 +184,9 @@ checks are included. `/-/live` folds the liveness checks, `/-/ready` the lifecyc
 Including `checks` in the probe responses is not just for humans: the kubelet records the response body of a failed
 `httpGet` probe in the pod's events, so `kubectl describe pod` shows which check failed rather than just "503".
 
+`/-/` is an index so the rest are discoverable, by tooling and by a human with `curl`. [HAL][hal] is another expired
+IETF draft, but it is what Spring's `/actuator` index returns and every language has a client for it.
+
 For metrics, [OpenMetrics][openmetrics] is the Prometheus exposition format formalised. Scrapers content-negotiate;
 an old one will ask for `text/plain; version=0.0.4` and should get it.
 
@@ -201,5 +205,6 @@ Nesting is safe because the conventions forbid a namespace also being a key. Two
 `process.command_line` and `process.executable.path` are populated by the standard detectors and can leak secrets.
 
 [ietf]: https://datatracker.ietf.org/doc/html/draft-inadarei-api-health-check-06
+[hal]: https://datatracker.ietf.org/doc/html/draft-kelly-json-hal-11
 [otel]: https://opentelemetry.io/docs/specs/semconv/resource/
 [openmetrics]: https://github.com/prometheus/OpenMetrics/blob/main/specification/OpenMetrics.md
