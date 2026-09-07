@@ -1,0 +1,4 @@
+# Only the Gemfile is copied into the image; the site itself is mounted at run
+# time. Keeping it out of the build context keeps `docker build` fast.
+*
+!Gemfile
