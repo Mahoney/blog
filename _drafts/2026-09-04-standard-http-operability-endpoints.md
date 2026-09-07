@@ -94,6 +94,27 @@ once. The top-level `status` is the worst of the checks. `/-/live` here would re
 }
 ```
 
+### Content negotiation
+
+Nice to have. Every endpoint honours `Accept`:
+
+| Requested                     | Served                                                                                       |
+|-------------------------------|----------------------------------------------------------------------------------------------|
+| `application/{type}+json`     | The formats above. This is the default for `*/*` or no `Accept` header, so `curl` gets JSON. |
+| `application/{type}+yaml`     | The same document as YAML. The `+yaml` suffix is [RFC 9512][yaml].                           |
+| `text/html`                   | A page readable without ECMAScript. Browsers ask for this first, so a browser gets a page.   |
+| `text/markdown`, `text/plain` | Markdown, which is also valid plain text.                                                    |
+
+The HTML and Markdown renderings list every `application/*` media type the endpoint serves, so a human who finds the
+page knows what a machine should ask for. The HTML page also includes the JSON of the same response in a folded
+`<details>` section, which needs no script. If `Accept` matches none of these, serve the default rather than 406.
+
+`/-/metrics` differs in two rows. `text/plain` means the Prometheus text exposition, because that is what scrapers ask
+for: Prometheus sends `application/openmetrics-text;version=1.0.0, text/plain;version=0.0.4;q=0.5, */*;q=0.1`, and
+older scrapers send `text/plain` or nothing. For the same reason the default is the text exposition, not JSON. There is
+no standard pull-format JSON for metrics; the nearest is the [OTLP/HTTP JSON encoding][otlp], which is a push payload
+served off-label, and is what `application/json` returns.
+
 ## Why
 
 ### The health checks that will call you
@@ -206,5 +227,7 @@ Nesting is safe because the conventions forbid a namespace also being a key. Two
 
 [ietf]: https://datatracker.ietf.org/doc/html/draft-inadarei-api-health-check-06
 [hal]: https://datatracker.ietf.org/doc/html/draft-kelly-json-hal-11
+[yaml]: https://www.rfc-editor.org/rfc/rfc9512
+[otlp]: https://opentelemetry.io/docs/specs/otlp/#json-protobuf-encoding
 [otel]: https://opentelemetry.io/docs/specs/semconv/resource/
 [openmetrics]: https://github.com/prometheus/OpenMetrics/blob/main/specification/OpenMetrics.md
