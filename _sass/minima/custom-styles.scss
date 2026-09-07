@@ -1,0 +1,42 @@
+// Anchors injected into headings by _includes/anchor_headings.html.
+//
+// Kept out of the flow so headings do not reflow on hover: the anchor is
+// absolutely positioned in the left margin, revealed on hover of the heading
+// and whenever it takes keyboard focus.
+.post-content {
+  h2, h3, h4, h5, h6 {
+    position: relative;
+  }
+
+  .heading-anchor {
+    position: absolute;
+    right: 100%;
+    padding-right: 0.2em;
+    opacity: 0;
+    text-decoration: none;
+    color: currentColor;
+    font-weight: normal;
+    transition: opacity 150ms ease-in-out;
+  }
+
+  :hover > .heading-anchor,
+  .heading-anchor:focus {
+    opacity: 0.45;
+  }
+
+  .heading-anchor:hover,
+  .heading-anchor:focus {
+    opacity: 1;
+  }
+}
+
+// Narrow viewports have no left margin to spare, so inline the anchor after
+// the heading text instead of hanging it outside.
+@media screen and (max-width: 800px) {
+  .post-content .heading-anchor {
+    position: static;
+    padding-right: 0;
+    padding-left: 0.3em;
+    opacity: 0.45;
+  }
+}
