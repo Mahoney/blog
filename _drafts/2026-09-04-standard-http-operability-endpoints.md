@@ -35,12 +35,15 @@ Wire the platform's checks up like this:
 
 What fails what:
 
-| State                                                            | `/-/live` | `/-/ready` | `/-/status`         |
-|------------------------------------------------------------------|-----------|------------|---------------------|
-| **Broken**: deadlock, leaked memory, wedged event loop           | fail      | fail       | fail                |
-| **Lifecycle**: starting up, draining on shutdown, not the leader | pass      | fail       | pass, noted         |
-| **Under pressure**: high CPU, GC storms, saturated pools         | pass      | pass       | warn                |
-| **Dependency down**: DB, message broker, upstream API            | pass      | pass       | warn, check details |
+| State                                                            | `/-/live` | `/-/ready` | `/-/status` |
+|------------------------------------------------------------------|-----------|------------|-------------|
+| **Broken**: deadlock, leaked memory, wedged event loop           | fail      | fail       | fail        |
+| **Lifecycle**: starting up, draining on shutdown, not the leader | pass      | fail       | fail        |
+| **Under pressure**: high CPU, GC storms, saturated pools         | pass      | pass       | warn        |
+| **Dependency down**: DB, message broker, upstream API            | pass      | pass       | fail        |
+
+`/-/status` reports the worst status of any check, so it is the one that tells the truth about the instance. It is
+also the one nothing automated acts on, which is what makes that safe.
 
 Dependency failures are handled in the application, by returning 503 with `Retry-After` on the routes that need the
 dependency, not by the infrastructure taking the instance out.
@@ -50,6 +53,32 @@ matcher defaults to 200, and `curl -f` exits non-zero on 400 and above. In pract
 out than answers 503, so probe timeouts matter as much as the response.
 
 `/-/info` looks like:
+`/-/status` on an instance whose database is unreachable looks like:
+
+```json
+{
+  "status": "fail",
+  "checks": {
+    "event-loop:lag": [
+      { "status": "pass", "observedValue": 3, "observedUnit": "ms", "time": "2026-09-04T10:42:14Z" }
+    ],
+    "lifecycle:phase": [
+      { "status": "pass", "observedValue": "serving", "time": "2026-09-04T10:42:14Z" }
+    ],
+    "jvm:heap": [
+      { "status": "warn", "observedValue": 91, "observedUnit": "percent", "time": "2026-09-04T10:42:14Z" }
+    ],
+    "postgres:connectivity": [
+      { "status": "fail", "componentType": "datastore", "output": "connection refused", "time": "2026-09-04T10:42:11Z" }
+    ]
+  }
+}
+```
+
+Keys in `checks` are `component:measurement`. Each maps to an array, since a component may be observed more than
+once. The top-level `status` is the worst of the checks. `/-/live` here would return only `event-loop:lag`, and
+`/-/ready` only `lifecycle:phase`, both `pass`.
+
 
 ```json
 {
