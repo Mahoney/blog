@@ -12,14 +12,15 @@ reasoning after.
 ## Recommendations
 
 One port, the one that serves traffic. Everything operability lives under `/-/`, which is itself an index of the
-rest. Restrict access to `/-/` by path at the ingress.
+rest. Restrict access to `/-/` by path at the ingress, except `/-/up`, which is public.
 
 | Endpoint     | For                 | Response                                                                                                     | Content-Type                                                 | Format                          |
 |--------------|---------------------|--------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------|---------------------------------|
-| `/-/`        | Discovery           | 200. `_links` to the five endpoints below, keyed `live`, `ready`, `status`, `info`, `metrics`.               | `application/hal+json`                                       | [HAL][hal]                      |
+| `/-/`        | Discovery           | 200. `_links` to the six endpoints below, keyed `live`, `ready`, `status`, `up`, `info`, `metrics`.          | `application/hal+json`                                       | [HAL][hal]                      |
 | `/-/live`    | Restart checks      | 200 `pass`, or 503 `fail` if the process is broken. `checks` lists the liveness checks.                      | `application/health+json`                                    | [IETF health check draft][ietf] |
 | `/-/ready`   | Routing checks      | 503 `fail` while starting, draining or not the leader, else 200 `pass`. `checks` lists the lifecycle checks. | `application/health+json`                                    | [IETF health check draft][ietf] |
-| `/-/status`  | Humans and alerting | Always 200. `checks` lists everything: liveness, lifecycle, pressure, dependencies.                          | `application/health+json`                                    | [IETF health check draft][ietf] |
+| `/-/status`  | Humans and alerting | 200 `pass` or `warn`, 503 `fail`. `checks` lists everything: liveness, lifecycle, pressure, dependencies.    | `application/health+json`                                    | [IETF health check draft][ietf] |
+| `/-/up`      | Uptime monitors     | `/-/status` with `checks` removed. Public.                                                                   | `application/health+json`                                    | [IETF health check draft][ietf] |
 | `/-/info`    | Humans and tooling  | The process's OpenTelemetry Resource, dotted keys nested.                                                    | `application/json`                                           | [OTel resource semconv][otel]   |
 | `/-/metrics` | Scrapers            | Current metric values.                                                                                       | `application/openmetrics-text; version=1.0.0; charset=utf-8` | [OpenMetrics][openmetrics]      |
 
@@ -33,6 +34,7 @@ Wire the platform's checks up like this:
 | K8S liveness probe            | `/-/live`                                |
 | K8S readiness probe           | `/-/ready`                               |
 | K8S startup probe             | `/-/ready`                               |
+| Third-party uptime monitor    | `/-/up`                                  |
 
 What fails what:
 
@@ -41,10 +43,16 @@ What fails what:
 | **Broken**: deadlock, leaked memory, wedged event loop           | fail      | fail       | fail        |
 | **Lifecycle**: starting up, draining on shutdown, not the leader | pass      | fail       | fail        |
 | **Under pressure**: high CPU, GC storms, saturated pools         | pass      | pass       | warn        |
-| **Dependency down**: DB, message broker, upstream API            | pass      | pass       | fail        |
+| **Dependency down**, needed by all traffic: the DB               | pass      | pass       | fail        |
+| **Dependency down**, needed by some routes: one upstream of many | pass      | pass       | warn        |
 
-`/-/status` reports the worst status of any check, so it is the one that tells the truth about the instance. It is
-also the one nothing automated acts on, which is what makes that safe.
+`/-/status` reports the worst status of any check, so it is the one that tells the truth about the instance. A
+dependency that every request needs makes it `fail`; one that only some routes need makes it `warn`, and the check
+lists those routes in `affectedEndpoints`. `/-/up` is the same fold with the checks stripped, so a third party can
+watch it without being told anything but up or down.
+
+Checks run on a timer, not per request. Every endpoint serves the latest snapshot, and each check's `time` says when
+it was taken.
 
 Dependency failures are handled in the application, by returning 503 with `Retry-After` on the routes that need the
 dependency, not by the infrastructure taking the instance out.
@@ -165,7 +173,9 @@ must pass everything.
 refused instead of a meaningful 503, new pods never go ready so unrelated rollouts stall, and when the dependency
 returns the fleet is not already up and waiting. Instead: return 503 with `Retry-After` on the routes that need the
 dependency, keep serving the ones that do not, and report dependency status on `/-/status` for humans and alerting.
-Nothing an orchestrator acts on should include dependency checks. Keeping `/-/status` separate is what stops someone
+There, a dependency needed by every request is `fail` and one needed by some routes is `warn`: a SaaS control plane
+that proxies to per-customer infrastructure is down when its database is down, not when one customer's proxy target
+is. Nothing an orchestrator acts on should include dependency checks. Keeping `/-/status` separate is what stops someone
 wiring a DB check into the liveness probe later because it was already there.
 
 The exception is a per-instance dependency - a sidecar, a local cache, a node that cannot reach the DB while its peers
@@ -200,10 +210,22 @@ most languages implement the draft and it is the format people reach for. The al
 Health, an actual spec, but it is `application/json` with `UP`/`DOWN` and no `warn`, and `warn` is exactly what
 `/-/status` needs for pressure and dependency states.
 
-All three endpoints return the same shape: a `status` and the `checks` that produced it. They differ only in which
-checks are included. `/-/live` folds the liveness checks, `/-/ready` the lifecycle checks, `/-/status` everything.
+All four health endpoints return the same shape: a `status` and the `checks` that produced it. They differ only in
+which checks are included. `/-/live` folds the liveness checks, `/-/ready` the lifecycle checks, `/-/status`
+everything, and `/-/up` is `/-/status` with `checks` omitted.
 Including `checks` in the probe responses is not just for humans: the kubelet records the response body of a failed
 `httpGet` probe in the pod's events, so `kubectl describe pod` shows which check failed rather than just "503".
+
+### Public status
+
+An SLA needs a third-party monitor, and a third-party monitor is far easier to run against an unauthenticated URL.
+But `/-/status` says which database is down and how full the heap is, which is not for strangers. Path-based
+authorisation at the ingress can allow or deny a path; it cannot strip a body. So the public view has to be a second
+path: `/-/up`, the same fold as `/-/status` with everything but the top-level `status` removed.
+
+Anything public under `/-/` must not do work per request. An unauthenticated endpoint that pings the database on every
+hit is an amplification vector. So checks run on a timer and the endpoints serve the latest snapshot, which is what the
+draft's per-check `time` field is for. That is good practice for the protected endpoints too.
 
 `/-/` is an index so the rest are discoverable, by tooling and by a human with `curl`. [HAL][hal] is another expired
 IETF draft, but it is what Spring's `/actuator` index returns and every language has a client for it.
