@@ -14,37 +14,42 @@ reasoning after.
 One port, the one that serves traffic. Everything operability lives under `/-/`, which is itself an index of the
 rest. Restrict access to `/-/` by path at the ingress, except `/-/up`, which is public.
 
-| Endpoint     | For                 | Response                                                                                                     | Content-Type                                                 | Format                          |
-|--------------|---------------------|--------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------|---------------------------------|
-| `/-/`        | Discovery           | 200. `_links` to the six endpoints below, keyed `live`, `ready`, `status`, `up`, `info`, `metrics`.          | `application/hal+json`                                       | [HAL][hal]                      |
-| `/-/live`    | Restart checks      | 200 `pass`, or 503 `fail` if the process is broken. `checks` lists the liveness checks.                      | `application/health+json`                                    | [IETF health check draft][ietf] |
-| `/-/ready`   | Routing checks      | 503 `fail` while starting, draining or not the leader, else 200 `pass`. `checks` lists the lifecycle checks. | `application/health+json`                                    | [IETF health check draft][ietf] |
-| `/-/status`  | Humans and alerting | 200 `pass` or `warn`, 503 `fail`. `checks` lists everything: liveness, lifecycle, pressure, dependencies.    | `application/health+json`                                    | [IETF health check draft][ietf] |
-| `/-/up`      | Uptime monitors     | `/-/status` with `checks` removed. Public.                                                                   | `application/health+json`                                    | [IETF health check draft][ietf] |
-| `/-/info`    | Humans and tooling  | The process's OpenTelemetry Resource, dotted keys nested.                                                    | `application/json`                                           | [OTel resource semconv][otel]   |
-| `/-/metrics` | Scrapers            | Current metric values.                                                                                       | `application/openmetrics-text; version=1.0.0; charset=utf-8` | [OpenMetrics][openmetrics]      |
+| Endpoint     | For                 | Response                                                                                                         | Content-Type                                                 | Format                          |
+|--------------|---------------------|------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------|---------------------------------|
+| `/-/`        | Discovery           | 200. `_links` to the seven endpoints below, keyed `live`, `started`, `ready`, `status`, `up`, `info`, `metrics`. | `application/hal+json`                                       | [HAL][hal]                      |
+| `/-/live`    | Restart checks      | 200 `pass`, or 503 `fail` if the process is broken. `checks` lists the liveness checks.                          | `application/health+json`                                    | [IETF health check draft][ietf] |
+| `/-/started` | Startup checks      | 503 `fail` until startup completes, then 200 `pass` for good. `checks` lists the startup check.                  | `application/health+json`                                    | [IETF health check draft][ietf] |
+| `/-/ready`   | Routing checks      | 503 `fail` while starting, draining or not the leader, else 200 `pass`. `checks` lists the lifecycle checks.     | `application/health+json`                                    | [IETF health check draft][ietf] |
+| `/-/status`  | Humans and alerting | 200 `pass` or `warn`, 503 `fail`. `checks` lists everything: liveness, lifecycle, pressure, dependencies.        | `application/health+json`                                    | [IETF health check draft][ietf] |
+| `/-/up`      | Uptime monitors     | `/-/status` with `checks` removed. Public.                                                                       | `application/health+json`                                    | [IETF health check draft][ietf] |
+| `/-/info`    | Humans and tooling  | The process's OpenTelemetry Resource, dotted keys nested.                                                        | `application/json`                                           | [OTel resource semconv][otel]   |
+| `/-/metrics` | Scrapers            | Current metric values.                                                                                           | `application/openmetrics-text; version=1.0.0; charset=utf-8` | [OpenMetrics][openmetrics]      |
 
 Wire the platform's checks up like this:
 
-| Check                         | Endpoint                                 |
-|-------------------------------|------------------------------------------|
-| Docker `HEALTHCHECK`          | `/-/live`                                |
-| ECS container health check    | `/-/live`                                |
-| ALB target group health check | `/-/live` on ECS, `/-/ready` elsewhere   |
-| K8S liveness probe            | `/-/live`                                |
-| K8S readiness probe           | `/-/ready`                               |
-| K8S startup probe             | `/-/ready`                               |
-| Third-party uptime monitor    | `/-/up`                                  |
+| Check                         | Endpoint                               |
+|-------------------------------|----------------------------------------|
+| Docker `HEALTHCHECK`          | `/-/live`                              |
+| ECS container health check    | `/-/live`                              |
+| ALB target group health check | `/-/live` on ECS, `/-/ready` elsewhere |
+| K8S liveness probe            | `/-/live`                              |
+| K8S readiness probe           | `/-/ready`                             |
+| K8S startup probe             | `/-/started`                           |
+| Third-party uptime monitor    | `/-/up`                                |
 
 What fails what:
 
-| State                                                            | `/-/live` | `/-/ready` | `/-/status` |
-|------------------------------------------------------------------|-----------|------------|-------------|
-| **Broken**: deadlock, leaked memory, wedged event loop           | fail      | fail       | fail        |
-| **Lifecycle**: starting up, draining on shutdown, not the leader | pass      | fail       | fail        |
-| **Under pressure**: high CPU, GC storms, saturated pools         | pass      | pass       | warn        |
-| **Dependency down**, needed by all traffic: the DB               | pass      | pass       | fail        |
-| **Dependency down**, needed by some routes: one upstream of many | pass      | pass       | warn        |
+| State                                                            | `/-/live` | `/-/started` | `/-/ready` | `/-/status` |
+|------------------------------------------------------------------|-----------|--------------|------------|-------------|
+| **Broken**: deadlock, leaked memory, wedged event loop           | fail      | pass         | fail       | fail        |
+| **Starting**: booting, warming caches, running migrations        | pass      | fail         | fail       | fail        |
+| **Lifecycle**: draining on shutdown, not the leader              | pass      | pass         | fail       | fail        |
+| **Under pressure**: high CPU, GC storms, saturated pools         | pass      | pass         | pass       | warn        |
+| **Dependency down**, needed by all traffic: the DB               | pass      | pass         | pass       | fail        |
+| **Dependency down**, needed by some routes: one upstream of many | pass      | pass         | pass       | warn        |
+
+`/-/started` passes for a broken instance because it did start. The kubelet stops calling it after its first success,
+and liveness takes over from there.
 
 `/-/status` reports the worst status of any check, so it is the one that tells the truth about the instance. A
 dependency that every request needs makes it `fail`; one that only some routes need makes it `warn`, and the check
@@ -70,6 +75,9 @@ out than answers 503, so probe timeouts matter as much as the response.
     "event-loop:lag": [
       { "status": "pass", "observedValue": 3, "observedUnit": "ms", "time": "2026-09-04T10:42:14Z" }
     ],
+    "lifecycle:startup": [
+      { "status": "pass", "observedValue": "complete", "time": "2026-09-04T10:42:14Z" }
+    ],
     "lifecycle:phase": [
       { "status": "pass", "observedValue": "serving", "time": "2026-09-04T10:42:14Z" }
     ],
@@ -84,8 +92,8 @@ out than answers 503, so probe timeouts matter as much as the response.
 ```
 
 Keys in `checks` are `component:measurement`. Each maps to an array, since a component may be observed more than
-once. The top-level `status` is the worst of the checks. `/-/live` here would return only `event-loop:lag`, and
-`/-/ready` only `lifecycle:phase`, both `pass`.
+once. The top-level `status` is the worst of the checks. `/-/live` here would return only `event-loop:lag`,
+`/-/started` only `lifecycle:startup`, and `/-/ready` only `lifecycle:phase`, all `pass`.
 
 `/-/info` looks like:
 
@@ -127,16 +135,16 @@ served off-label, and is what `application/json` returns.
 
 ### The health checks that will call you
 
-| Check                         | Who runs it              | Where from                    | Question it answers                  | On failure                                         |
-|-------------------------------|--------------------------|-------------------------------|--------------------------------------|----------------------------------------------------|
-| Docker `HEALTHCHECK`          | Docker daemon            | Inside the container (`exec`) | Is this process working?             | Status flag set to `unhealthy`. Nothing else.      |
-| ECS container health check    | ECS agent (same syntax)  | Inside the container (`exec`) | Is this container working?           | Task stopped and replaced.                         |
-| ALB target group health check | Load balancer nodes      | Over the network              | Should I route traffic here?         | Target taken out of rotation. On ECS, task killed. |
-| K8S liveness probe            | kubelet                  | From the node                 | Is this process stuck?               | Container restarted.                               |
-| K8S readiness probe           | kubelet                  | From the node                 | Should this pod receive traffic?     | Pod removed from Service endpoints. Not restarted. |
-| K8S startup probe             | kubelet                  | From the node                 | Has this container finished booting? | Liveness suppressed until it passes.               |
+| Check                         | Who runs it             | Where from                    | Question it answers                  | On failure                                                       |
+|-------------------------------|-------------------------|-------------------------------|--------------------------------------|------------------------------------------------------------------|
+| Docker `HEALTHCHECK`          | Docker daemon           | Inside the container (`exec`) | Is this process working?             | Status flag set to `unhealthy`. Nothing else.                    |
+| ECS container health check    | ECS agent (same syntax) | Inside the container (`exec`) | Is this container working?           | Task stopped and replaced.                                       |
+| ALB target group health check | Load balancer nodes     | Over the network              | Should I route traffic here?         | Target taken out of rotation. On ECS, task killed.               |
+| K8S liveness probe            | kubelet                 | From the node                 | Is this process stuck?               | Container restarted.                                             |
+| K8S readiness probe           | kubelet                 | From the node                 | Should this pod receive traffic?     | Pod removed from Service endpoints. Not restarted.               |
+| K8S startup probe             | kubelet                 | From the node                 | Has this container finished booting? | Liveness suppressed until it passes. Restarted if it never does. |
 
-Two mechanisms are at work: _restart_ checks (Docker, ECS, liveness) and _routing_ checks (ALB, readiness). Only K8S
+Two mechanisms are at work: _restart_ checks (Docker, ECS, liveness, startup) and _routing_ checks (ALB, readiness). Only K8S
 keeps them cleanly separate.
 
 Some wrinkles:
@@ -148,7 +156,8 @@ Some wrinkles:
 - Docker and ECS run the check _inside_ the container, so the image needs `curl` or equivalent. ALB and the kubelet
   probe over the network, so they also prove the port is bound and reachable.
 - K8S's startup probe has rough equivalents in ECS's `startPeriod` on the container health check and
-  `healthCheckGracePeriodSeconds` on the service for ALB checks.
+  `healthCheckGracePeriodSeconds` on the service for ALB checks, but those only suppress failures. Neither restarts
+  a task that never finishes booting.
 
 The consequence: a check that fails when a downstream dependency is down is appropriate as a routing check and
 harmful as a restart check, since restarting will not fix the dependency. On ECS, where routing checks trigger
@@ -161,7 +170,9 @@ Four kinds of unhealthy, and they want different responses.
 **Broken** - deadlock, leaked memory, wedged event loop. Only a restart will fix it. Fail everything.
 
 **Lifecycle** - starting up, draining on shutdown, not the leader. Instance-specific and will resolve itself. Fail
-routing, pass restart.
+routing, pass restart. Starting up is the exception, because it has a deadline: an instance that never finishes booting
+is broken, and only a restart will fix it. That is what the startup probe is for, and why it gets its own endpoint.
+Pointing it at `/-/ready` would restart a standby forever, because a standby that is not the leader never goes ready.
 
 **Under pressure** looks like a routing failure - take the hot instance out until it cools. But if load is even, every
 instance is hot. Failing readiness across the fleet leaves the Service with no endpoints, and each instance that drops
@@ -210,9 +221,9 @@ most languages implement the draft and it is the format people reach for. The al
 Health, an actual spec, but it is `application/json` with `UP`/`DOWN` and no `warn`, and `warn` is exactly what
 `/-/status` needs for pressure and dependency states.
 
-All four health endpoints return the same shape: a `status` and the `checks` that produced it. They differ only in
-which checks are included. `/-/live` folds the liveness checks, `/-/ready` the lifecycle checks, `/-/status`
-everything, and `/-/up` is `/-/status` with `checks` omitted.
+All five health endpoints return the same shape: a `status` and the `checks` that produced it. They differ only in
+which checks are included. `/-/live` folds the liveness checks, `/-/started` the startup check, `/-/ready` the
+lifecycle checks, `/-/status` everything, and `/-/up` is `/-/status` with `checks` omitted.
 Including `checks` in the probe responses is not just for humans: the kubelet records the response body of a failed
 `httpGet` probe in the pod's events, so `kubectl describe pod` shows which check failed rather than just "503".
 
